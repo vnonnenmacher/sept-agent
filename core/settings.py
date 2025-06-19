@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'apps.vitals',
     'apps.labs',
     'apps.alerts',
+    'apps.embeddings',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
