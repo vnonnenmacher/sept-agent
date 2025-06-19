@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg
+*.egg-info/
+dist/
+build/
+env/
+venv/
+*.sqlite3
+
+# VSCode
+.vscode/
+
+# Django
+*.log
+*.pot
+*.pyc
+local_settings.py
+db.sqlite3
+media
+
+# Docker
+*.pid
+*.sock
+db_data/
+qdrant_data/
+*.tar
+
+# System
+.DS_Store
+.idea/
+*.swp
+
+# Secrets (Example: be careful here)
+.env
