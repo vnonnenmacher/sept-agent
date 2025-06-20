@@ -35,10 +35,10 @@ INSTALLED_APPS = [
     'rest_framework',
     'apps.ingestion',
     'apps.patients',
-    'apps.vitals',
-    'apps.labs',
     'apps.alerts',
     'apps.embeddings',
+    'apps.qdrant',
+    'apps.sepsis',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -132,3 +132,7 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CELERY_BROKER_URL = 'redis://redis:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'

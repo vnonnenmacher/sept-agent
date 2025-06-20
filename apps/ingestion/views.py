@@ -1,178 +1,300 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from apps.patients.models import Patient
 from django.utils.dateparse import parse_datetime
-from apps.vitals.models import VitalsObservation
-from apps.labs.models import LabResult
+
+from apps.patients.models import Patient
+from apps.sepsis.models import (
+    SepsisEpisode,
+    Sample,
+    CultureResult,
+    Organism,
+    Antibiogram,
+    AntibioticSusceptibility,
+    VitalsObservation,
+    LabResult,
+    AntibioticAdministration,
+    ClinicalNote
+)
 
 
 class FHIRPatientIngestionView(APIView):
-    """
-    Endpoint to receive FHIR Patient resource via webhook.
-    """
-
     def post(self, request):
         data = request.data
 
         try:
-            # Extract patient ID
             patient_id = data.get('id')
             if not patient_id:
-                return Response({"error": "Missing 'id' field in Patient resource."}, status=400)
+                return Response({"error": "Missing 'id' field."}, status=400)
 
-            # Extract name
             name_data = data.get('name', [])
-            if name_data and isinstance(name_data, list):
-                given = " ".join(name_data[0].get('given', []))
-                family = name_data[0].get('family', '')
-                full_name = f"{given} {family}".strip()
-            else:
-                full_name = "Unknown"
+            given = " ".join(name_data[0].get('given', [])) if name_data else ""
+            family = name_data[0].get('family', '') if name_data else ""
+            full_name = f"{given} {family}".strip() or "Unknown"
 
-            # Extract gender
             gender = data.get('gender', 'unknown')
-
-            # Extract birth date
             birth_date = data.get('birthDate', None)
 
-            # Create or update patient
             patient, created = Patient.objects.update_or_create(
                 patient_id=patient_id,
-                defaults={
-                    'name': full_name,
-                    'gender': gender,
-                    'birth_date': birth_date
-                }
+                defaults={'name': full_name, 'gender': gender, 'birth_date': birth_date}
             )
 
             return Response({
                 "status": "created" if created else "updated",
                 "patient_id": patient.patient_id
-            }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+            }, status=201 if created else 200)
 
         except Exception as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_400_BAD_REQUEST
+            return Response({"error": str(e)}, status=400)
+
+
+class FHIROpenSepsisEpisodeView(APIView):
+    def post(self, request):
+        try:
+            patient_id = request.data.get('patient_id')
+            started_at = parse_datetime(request.data.get('startedAt'))
+
+            patient = Patient.objects.get(patient_id=patient_id)
+
+            episode = SepsisEpisode.objects.create(
+                patient=patient,
+                started_at=started_at
             )
 
+            return Response({"status": "episode opened", "episode_id": episode.id}, status=201)
 
-class FHIRObservationIngestionView(APIView):
-    """
-    Ingest any FHIR Observation:
-    - Vital signs (component-based)
-    - Lab results (valueQuantity)
-    - Antibiograms (component-based with organism)
-    """
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
 
+
+class FHIRCloseSepsisEpisodeView(APIView):
     def post(self, request):
-        data = request.data
-
         try:
-            # ✅ Patient
-            subject = data.get('subject', {}).get('reference')
-            if not subject or not subject.startswith('Patient/'):
-                return Response({"error": "Missing or invalid 'subject' reference."}, status=400)
-            patient_id = subject.split('/')[-1]
-            patient, _ = Patient.objects.get_or_create(patient_id=patient_id)
+            episode_id = request.data.get('episode_id')
+            ended_at = parse_datetime(request.data.get('endedAt'))
 
-            # ✅ Observation time
+            episode = SepsisEpisode.objects.get(id=episode_id)
+            episode.ended_at = ended_at
+            episode.save()
+
+            return Response({"status": "episode closed"}, status=200)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+class FHIRCultureIngestionView(APIView):
+    def post(self, request):
+        try:
+            data = request.data
+            patient_id = data.get('subject', {}).get('reference', '').split('/')[-1]
+            patient = Patient.objects.get(patient_id=patient_id)
+
+            episode = SepsisEpisode.objects.filter(patient=patient).order_by('-started_at').first()
+            if not episode:
+                return Response({"error": "No active episode."}, status=400)
+
             observed_at = parse_datetime(data.get('effectiveDateTime'))
-            if not observed_at:
-                return Response({"error": "Missing or invalid 'effectiveDateTime'."}, status=400)
+            material = data.get('bodySite', {}).get('text', 'Unknown')
 
-            # ✅ Observation category
-            try:
-                category = data.get('category', [])[0]['coding'][0]['code']
-            except Exception:
-                return Response({"error": "Missing 'category'."}, status=400)
+            sample, _ = Sample.objects.get_or_create(
+                episode=episode,
+                material=material,
+                collected_at=observed_at
+            )
 
-            # ✅ Observation code
-            observation_code = data.get('code', {}).get('coding', [{}])[0].get('code', '')
+            result = data.get('valueCodeableConcept', {}).get('text', '').lower()
+            if result not in ['positive', 'negative']:
+                return Response({"error": "Result must be 'positive' or 'negative'."}, status=400)
 
-            # 🔥 ANTIBIOGRAM DETECTION (laboratory + code == 18769-0)
-            if category == 'laboratory' and observation_code == '18769-0' and 'component' in data:
-                organism = data.get('valueCodeableConcept', {}).get('text', 'Unknown organism')
+            culture = CultureResult.objects.create(
+                sample=sample,
+                result=result,
+                reported_at=observed_at
+            )
 
-                created = 0
+            if result == 'positive':
                 for comp in data.get('component', []):
-                    antibiotic = comp['code']['coding'][0]['display']
-                    result = comp.get('valueCodeableConcept', {}).get('text')
+                    organism_name = comp.get('valueCodeableConcept', {}).get('text')
+                    if organism_name:
+                        Organism.objects.create(culture_result=culture, name=organism_name)
 
-                    if not (antibiotic and result):
-                        continue
+            return Response({"status": "culture recorded"}, status=201)
 
-                    LabResult.objects.create(
-                        patient=patient,
-                        exam_code="ANTIBIOGRAM",
-                        exam_name=f"Antibiogram - {antibiotic}",
-                        value=result,
-                        unit=None,
-                        observed_at=observed_at,
-                        additional_info={"organism": organism, "antibiotic": antibiotic}
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+class FHIRAntibiogramIngestionView(APIView):
+    def post(self, request):
+        try:
+            data = request.data
+            patient_id = data.get('subject', {}).get('reference', '').split('/')[-1]
+            patient = Patient.objects.get(patient_id=patient_id)
+
+            episode = SepsisEpisode.objects.filter(patient=patient).order_by('-started_at').first()
+            if not episode:
+                return Response({"error": "No active episode."}, status=400)
+
+            observed_at = parse_datetime(data.get('effectiveDateTime'))
+            organism_name = data.get('valueCodeableConcept', {}).get('text', 'Unknown')
+            organism = Organism.objects.filter(name=organism_name).order_by('-id').first()
+
+            if not organism:
+                return Response({"error": "Organism not found."}, status=400)
+
+            antibiogram = Antibiogram.objects.create(
+                organism=organism,
+                created_at=observed_at
+            )
+
+            count = 0
+            for comp in data.get('component', []):
+                antibiotic = comp['code']['coding'][0]['display']
+                result = comp.get('valueCodeableConcept', {}).get('text')
+
+                if antibiotic and result:
+                    AntibioticSusceptibility.objects.create(
+                        antibiogram=antibiogram,
+                        antibiotic=antibiotic,
+                        result=result
                     )
-                    created += 1
+                    count += 1
 
-                if created == 0:
-                    return Response({"error": "No valid antibiogram components processed."}, status=400)
+            if count == 0:
+                return Response({"error": "No valid components."}, status=400)
 
-                return Response({"status": f"{created} antibiogram results recorded"}, status=201)
+            return Response({"status": f"{count} antibiogram entries recorded"}, status=201)
 
-            # 🔥 VITAL SIGNS (vital-signs + component[])
-            elif category == 'vital-signs' and 'component' in data:
-                components = data.get('component', [])
-                vitals_data = {}
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
 
-                for comp in components:
-                    code = comp['code']['coding'][0]['code']
-                    value = comp.get('valueQuantity', {}).get('value')
 
-                    if value is None:
-                        continue
+class FHIRVitalsIngestionView(APIView):
+    def post(self, request):
+        try:
+            data = request.data
+            patient_id = data.get('subject', {}).get('reference', '').split('/')[-1]
+            patient = Patient.objects.get(patient_id=patient_id)
 
-                    if code == '8480-6':
-                        vitals_data['blood_pressure_sys'] = value
-                    elif code == '8462-4':
-                        vitals_data['blood_pressure_dia'] = value
-                    elif code == '8867-4':
-                        vitals_data['heart_rate'] = value
-                    elif code == '9279-1':
-                        vitals_data['respiratory_rate'] = value
-                    elif code == '8310-5':
-                        vitals_data['temperature'] = value
-                    elif code == '59408-5':
-                        vitals_data['oxygen_saturation'] = value
+            episode = SepsisEpisode.objects.filter(patient=patient).order_by('-started_at').first()
+            if not episode:
+                return Response({"error": "No active episode."}, status=400)
 
-                if not vitals_data:
-                    return Response({"error": "No valid vital signs components."}, status=400)
+            observed_at = parse_datetime(data.get('effectiveDateTime'))
 
-                VitalsObservation.objects.create(
-                    patient=patient,
-                    observed_at=observed_at,
-                    **vitals_data
-                )
+            components = data.get('component', [])
+            vitals = {}
 
-                return Response({"status": "vitals recorded"}, status=201)
+            for comp in components:
+                code = comp['code']['coding'][0]['code']
+                value = comp.get('valueQuantity', {}).get('value')
 
-            # 🔥 SIMPLE LAB RESULT (laboratory + valueQuantity)
-            elif category == 'laboratory' and 'valueQuantity' in data:
-                LabResult.objects.create(
-                    patient=patient,
-                    exam_code=data['code']['coding'][0]['code'],
-                    exam_name=data['code']['coding'][0]['display'],
-                    value=data['valueQuantity']['value'],
-                    unit=data['valueQuantity'].get('unit'),
-                    observed_at=observed_at
-                )
+                if value is None:
+                    continue
 
-                return Response({"status": "lab result recorded"}, status=201)
+                if code == '8480-6':
+                    vitals['blood_pressure_sys'] = value
+                elif code == '8462-4':
+                    vitals['blood_pressure_dia'] = value
+                elif code == '8867-4':
+                    vitals['heart_rate'] = value
+                elif code == '9279-1':
+                    vitals['respiratory_rate'] = value
+                elif code == '8310-5':
+                    vitals['temperature'] = value
+                elif code == '59408-5':
+                    vitals['oxygen_saturation'] = value
 
-            else:
-                return Response(
-                    {"error": "Unsupported observation format or missing components/valueQuantity."},
-                    status=400
-                )
+            if not vitals:
+                return Response({"error": "No valid vitals."}, status=400)
+
+            VitalsObservation.objects.create(
+                episode=episode,
+                observed_at=observed_at,
+                **vitals
+            )
+
+            return Response({"status": "vitals recorded"}, status=201)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+class FHIRLabResultIngestionView(APIView):
+    def post(self, request):
+        try:
+            data = request.data
+            patient_id = data.get('subject', {}).get('reference', '').split('/')[-1]
+            patient = Patient.objects.get(patient_id=patient_id)
+
+            episode = SepsisEpisode.objects.filter(patient=patient).order_by('-started_at').first()
+            if not episode:
+                return Response({"error": "No active episode."}, status=400)
+
+            observed_at = parse_datetime(data.get('effectiveDateTime'))
+
+            LabResult.objects.create(
+                episode=episode,
+                exam_code=data['code']['coding'][0]['code'],
+                exam_name=data['code']['coding'][0]['display'],
+                value=data['valueQuantity']['value'],
+                unit=data['valueQuantity'].get('unit'),
+                observed_at=observed_at
+            )
+
+            return Response({"status": "lab result recorded"}, status=201)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+class FHIRAntibioticAdministrationIngestionView(APIView):
+    def post(self, request):
+        try:
+            data = request.data
+            patient_id = data.get('subject', {}).get('reference', '').split('/')[-1]
+            patient = Patient.objects.get(patient_id=patient_id)
+
+            episode = SepsisEpisode.objects.filter(patient=patient).order_by('-started_at').first()
+            if not episode:
+                return Response({"error": "No active episode."}, status=400)
+
+            AntibioticAdministration.objects.create(
+                episode=episode,
+                name=data.get('medicationCodeableConcept', {}).get('text'),
+                started_at=parse_datetime(data.get('effectivePeriod', {}).get('start')),
+                stopped_at=parse_datetime(data.get('effectivePeriod', {}).get('end')),
+                dose=data.get('dosage', [{}])[0].get('text'),
+                route=data.get('route', {}).get('text')
+            )
+
+            return Response({"status": "antibiotic administration recorded"}, status=201)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+
+class FHIRClinicalNoteIngestionView(APIView):
+    def post(self, request):
+        try:
+            data = request.data
+            patient_id = data.get('subject', {}).get('reference', '').split('/')[-1]
+            patient = Patient.objects.get(patient_id=patient_id)
+
+            episode = SepsisEpisode.objects.filter(patient=patient).order_by('-started_at').first()
+            if not episode:
+                return Response({"error": "No active episode."}, status=400)
+
+            ClinicalNote.objects.create(
+                episode=episode,
+                author=data.get('author', {}).get('display'),
+                content=data.get('content', [{}])[0].get('text', {}).get('div'),
+                created_at=parse_datetime(data.get('date'))
+            )
+
+            return Response({"status": "note recorded"}, status=201)
 
         except Exception as e:
             return Response({"error": str(e)}, status=400)

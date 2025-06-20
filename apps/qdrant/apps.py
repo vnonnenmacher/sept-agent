@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class LabsConfig(AppConfig):
+class QdrantConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'apps.labs'
+    name = 'apps.qdrant'

@@ -3,8 +3,8 @@ version: '3.9'
 services:
   db:
     image: mysql:8.0
-    container_name: mysql
     restart: always
+    container_name: db
     environment:
       MYSQL_DATABASE: sepsis_db
       MYSQL_USER: user
@@ -16,22 +16,33 @@ services:
       - db_data:/var/lib/mysql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
 
   qdrant:
     image: qdrant/qdrant
-    container_name: qdrant
     restart: always
+    container_name: qdrant
     ports:
       - "6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
 
+  redis:
+    image: redis:7
+    restart: always
+    container_name: redis
+    ports:
+      - "6379:6379"
+
   django:
     build: .
     container_name: django
+    command: >
+      sh -c "./wait-for-it.sh db:3306 -- 
+             python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
     ports:
@@ -39,15 +50,28 @@ services:
     depends_on:
       - db
       - qdrant
+      - redis
     environment:
       DJANGO_DB_HOST: db
       DJANGO_DB_NAME: sepsis_db
       DJANGO_DB_USER: user
       DJANGO_DB_PASSWORD: password
-    command: >
-      sh -c "./wait-for-it.sh db:3306 -- 
-             python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+
+  worker:
+    build: .
+    container_name: celery_worker
+    command: celery -A core worker --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+      - qdrant
+    environment:
+      DJANGO_DB_HOST: db
+      DJANGO_DB_NAME: sepsis_db
+      DJANGO_DB_USER: user
+      DJANGO_DB_PASSWORD: password
 
 volumes:
   db_data:
