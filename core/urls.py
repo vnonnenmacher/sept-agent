@@ -21,4 +21,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('apps.ingestion.urls')),
     path('qdrant/', include('apps.qdrant.urls')),
+    path('api/sepsis/', include('apps.sepsis.urls')),
 ]

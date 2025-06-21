@@ -6,3 +6,4 @@ sentence-transformers
 celery>=5.3.0
 redis>=5.0.0
 qdrant-client
+faker
