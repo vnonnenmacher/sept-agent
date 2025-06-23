@@ -1,76 +1,94 @@
-🏗️ Backend
-Linguagem: Python
+# 🦠 Projeto Sepse - Plataforma de Monitoramento e Suporte Clínico
 
-Framework: Django + Django REST Framework (DRF)
+## 📜 Descrição
 
-Banco de Dados: PostgreSQL
+O Projeto Sepse é uma plataforma para **monitoramento clínico inteligente**, com foco na detecção, acompanhamento e gestão de pacientes com sepse. A solução combina uma base de dados relacional tradicional com uma camada de inteligência semântica baseada em embeddings e busca vetorial.
 
-ORM: Django ORM
+Ela integra dados de diferentes sistemas hospitalares (HL7, APIs) e permite consultas tanto estruturadas quanto semânticas, facilitando a tomada de decisão clínica, geração de alertas e suporte ao protocolo de sepse.
 
-Armazenamento Vetorial: Qdrant (para RAG, embeddings, IA contextual)
+---
 
-Task Queue: Celery
+## 🚀 Funcionalidades
 
-Broker: Redis
+* ✅ Ingestão de dados clínicos via **HL7** e **API REST/FHIR-like**.
+* ✅ Armazenamento seguro e consistente em banco relacional (**PostgreSQL**).
+* ✅ Processamento assíncrono de dados clínicos.
+* ✅ Geração de contexto semântico usando **NLP e modelos de embeddings biomédicos**.
+* ✅ Armazenamento vetorial no **Qdrant** para busca por similaridade semântica.
+* ✅ Dashboard, APIs e ferramentas para suporte clínico e tomada de decisão.
+* ✅ Arquitetura escalável e modular.
 
-API padrão: FHIR-like, com endpoints RESTful próprios
+---
 
-Observabilidade: Logs estruturados e possibilidade de integração com ferramentas como Datadog
+## 🔧 Tecnologias Principais
 
-🔬 IA e Machine Learning
-Framework de IA:
+| Tecnologia           | Função                                    |
+| -------------------- | ----------------------------------------- |
+| Django + DRF         | Backend e APIs REST                       |
+| PostgreSQL           | Banco relacional (Data Lake estruturado)  |
+| Redis                | Broker de filas para tarefas              |
+| Celery               | Processamento assíncrono                  |
+| Qdrant               | Banco de dados vetorial (busca semântica) |
+| SentenceTransformers | Geração de embeddings NLP biomédicos      |
+| Docker               | Containers e ambiente isolado             |
+| HL7 Parser           | Integração com sistemas legados (HIS/LIS) |
+| Flutter              | Frontend multiplataforma (Desktop/Mobile) |
 
-Uso de embeddings via sentence-transformers
+---
 
-Testes com modelos biomédicos (ex.: pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb)
+## 📄 Fluxo da Solução
 
-RAG: Utilização de Qdrant como vetor de contexto para sistemas de recomendação clínica e agentes inteligentes
+1. 📥 **Entrada:** Dados chegam via HL7 ou API REST.
+2. 💄 **Persistência:** Dados são armazenados no PostgreSQL.
+3. ⚙️ **Task:** Uma task Celery é disparada para processar o dado.
+4. 🧠 **Semântica:** São geradas frases descritivas com contexto clínico.
+5. 📂 **Embeddings:** As frases são convertidas em vetores com NLP.
+6. 🗂️ **Indexação:** Vetores são armazenados no Qdrant.
+7. 🔍 **Busca:** Queries semânticas recuperam informações contextuais.
 
-Data Generation: Simuladores de fluxo realista de pacientes e eventos clínicos (simula dados com faker + regras clínicas do protocolo de sepse)
+---
 
-📱 Frontend
-Framework: Flutter (projetado para multiplataforma — tablet, desktop e mobile)
+## 🏗️ Arquitetura
 
-Arquitetura: Modular, com controle de estado e controllers dedicados por feature
+```
+[HL7/API] --> [Django API] --> [PostgreSQL]
+                               |
+                               --> [Celery + Redis] --> [Qdrant (Vetores)]
+```
 
-Design: Material Design, UI médica segura, com foco em legibilidade, hierarquia de informações e navegação eficiente para profissionais de saúde
+---
 
-☁️ Infraestrutura
-Contêineres: Docker
+## 🚀 Como Rodar Localmente
 
-Orquestração: Docker Compose local, com possibilidade de expansão para Kubernetes
+```bash
+# Clone o repositório
+git clone https://github.com/seu-usuario/projeto-sepse.git
+cd projeto-sepse
 
-Mensageria: Redis (via Celery)
+# Suba os serviços
+docker-compose up --build
+```
 
-Ambiente de desenvolvimento: WSL (Linux), MacOS e ambientes cloud-ready
+Acesse a API em: `http://localhost:8000/api/`
 
-Controle de versão: Git + GitHub
+---
 
-Ambiente de deploy (previsto): Kubernetes + PostgreSQL Cloud + Qdrant Cloud (ou local)
+## 📁 Documentação
 
-🔗 Integrações
-Padrões de interoperabilidade: FHIR simplificado
+* API REST disponível em `/api/`
+* Documentação interativa (Swagger ou ReDoc) em `/docs/` (se configurado)
 
-Possibilidade futura: HL7, integração com sistemas HIS e LIS
+---
 
-APIs externas: Integração potencial com sistemas de IA médica, serviços de monitoramento ou EHR externos
+## 🤝 Contribuição
 
-🩺 Domínio Clínico
-Modelagem: Baseada no fluxo real do protocolo de sepse
+Contribuições são bem-vindas! Abra uma issue ou envie um pull request.
 
-Eventos clínicos modelados:
+---
 
-Abertura e encerramento de episódio de sepse
+## 🏥 Licença
 
-Inserção de culturas (positivas e negativas)
+Projeto desenvolvido para fins de pesquisa e inovação em saúde.
+Licença sob avaliação.
 
-Microbiologia (organismos, antibiogramas)
-
-Administração de antibióticos
-
-Sinais vitais
-
-Exames laboratoriais
-
-Notas clínicas
-
+---
