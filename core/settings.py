@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'apps.embeddings',
     'apps.qdrant',
     'apps.sepsis',
+    'apps.protocols',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

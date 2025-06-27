@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb')"
 
 # Add wait-for-it script
 ADD https://raw.githubusercontent.com/vishnubob/wait-for-it/master/wait-for-it.sh .

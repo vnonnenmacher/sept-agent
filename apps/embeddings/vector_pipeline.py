@@ -1,38 +1,48 @@
+import uuid
+from functools import lru_cache
+from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from sentence_transformers import SentenceTransformer
-import uuid
 
-
-# ✅ Qdrant Client e Modelo
+# Qdrant client
 client = QdrantClient("qdrant", port=6333)
-model = SentenceTransformer('pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb')
+
+# Lazy-loaded BioBERT model
+@lru_cache()
+def get_model():
+    print("📦 Loading BioBERT embedding model (pritamdeka/BioBERT...)")
+    return SentenceTransformer("pritamdeka/BioBERT-mnli-snli-scinli-scitail-mednli-stsb")
 
 
-# ✅ Collection
+# Ensure collection exists
 def create_collection_if_not_exists(collection_name="clinical-data"):
     if not client.collection_exists(collection_name=collection_name):
         client.recreate_collection(
             collection_name=collection_name,
             vectors_config=models.VectorParams(
-                size=384,
+                size=768,
                 distance=models.Distance.COSINE
             )
         )
-        print(f"✅ Collection '{collection_name}' criada.")
+        print(f"✅ Collection '{collection_name}' created.")
     else:
-        print(f"✔️ Collection '{collection_name}' já existe.")
+        print(f"✔️ Collection '{collection_name}' already exists.")
 
 
-# ===============================================================
-# 🚀 Função Genérica de Processamento
-# ===============================================================
+# Process embedding
 def process_embedding(payload: dict):
     create_collection_if_not_exists()
-
+    model = get_model()
+    print(f"🧠 Embedding: {payload.get('type')} ({payload.get('text')[:60]}...)")
     embedding = model.encode(payload["text"]).tolist()
 
-    point_id = f"{payload['type']}_{payload.get('patient_id') or payload.get('episode_id') or payload.get('culture_id') or payload.get('organism_id') or payload.get('vitals_id') or payload.get('lab_id') or payload.get('antibiogram_id') or payload.get('administration_id') or payload.get('note_id') or uuid.uuid4()}"
+    point_id = f"{payload['type']}_" + (
+        payload.get('patient_id') or payload.get('episode_id') or
+        payload.get('culture_id') or payload.get('organism_id') or
+        payload.get('vitals_id') or payload.get('lab_id') or
+        payload.get('antibiogram_id') or payload.get('administration_id') or
+        payload.get('note_id') or str(uuid.uuid4())
+    )
 
     point = models.PointStruct(
         id=point_id,
@@ -42,6 +52,7 @@ def process_embedding(payload: dict):
 
     client.upsert(collection_name="clinical-data", points=[point])
     print(f"✅ Embedded {payload['type']} → {payload.get('patient_id', '')}")
+
 
 
 # ===============================================================

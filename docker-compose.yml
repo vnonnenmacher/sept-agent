@@ -69,17 +69,20 @@ services:
     build: .
     container_name: django
     command: >
-      sh -c "./wait-for-it.sh db:3306 -- 
-             python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+      sh -c "./wait-for-it.sh db:3306 --timeout=60 --
+            python manage.py migrate &&
+            python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - qdrant
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      qdrant:
+        condition: service_started
     environment:
       DJANGO_DB_HOST: db
       DJANGO_DB_NAME: sepsis_db
@@ -96,6 +99,8 @@ services:
       - db
       - redis
       - qdrant
+      - django
+
     environment:
       DJANGO_DB_HOST: db
       DJANGO_DB_NAME: sepsis_db
