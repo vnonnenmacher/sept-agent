@@ -2,10 +2,13 @@
 
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
-from .models import SepsisEpisode
 from .serializers import SepsisEpisodeDetailSerializer
 from rest_framework.generics import ListAPIView
 from .serializers import SepsisEpisodeListSerializer
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.db.models import Count
+from .models import SepsisEpisode
 
 
 class SepsisEpisodeDetailView(RetrieveAPIView):
@@ -43,3 +46,35 @@ class SepsisEpisodeListView(ListAPIView):
             queryset = queryset.filter(started_at__date__lte=start_before)
 
         return queryset.order_by('-started_at')
+
+
+class SepsisStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        # 🔥 Base queryset: Open episodes
+        open_episodes = SepsisEpisode.objects.filter(ended_at__isnull=True)
+
+        total_open = open_episodes.count()
+
+        # 🔬 Open episodes without any culture requested
+        open_without_culture = open_episodes.annotate(
+            culture_count=Count('cultureresult')
+        ).filter(culture_count=0).count()
+
+        # 💉 Open episodes without any antibiotic administration
+        open_without_antibiotic = open_episodes.annotate(
+            antibiotic_count=Count('antibioticadministration')
+        ).filter(antibiotic_count=0).count()
+
+        # ⚠️ Open episodes with positive cultures
+        open_with_positive_culture = open_episodes.filter(
+            cultureresult__positive=True
+        ).distinct().count()
+
+        return Response({
+            "total_open_episodes": total_open,
+            "open_episodes_without_culture": open_without_culture,
+            "open_episodes_without_antibiotic": open_without_antibiotic,
+            "open_episodes_with_positive_culture": open_with_positive_culture,
+        })
