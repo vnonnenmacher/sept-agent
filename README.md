@@ -71,6 +71,47 @@ docker-compose up --build
 
 Acesse a API em: `http://localhost:8000/api/`
 
+✅ Adiocionar protocolo de sepse 
+```bash
+curl -X POST http://localhost:8000/api/protocols/upload/ \
+  -F "file=@hospital-protocolo-sepse-v4.pdf" \
+  -F "version=v4"
+```
+✅ Sugerir Antibiótico
+```bash
+curl -X POST http://localhost:8000/api/agent/suggest-antibiotic/ \
+  -H "Content-Type: application/json" \
+  -d '{
+        "organism": "Klebsiella pneumoniae",
+        "sensitivity": "resistant to ceftriaxone, sensitive to meropenem",
+        "antibiotics": []
+      }'
+```
+✅ Sugerir próxima ação
+```bash
+curl -X POST http://localhost:8000/api/agent/next-step/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clinical_status": "culture positive 3 hours ago, no antibiotic started",
+    "events": [
+      "blood culture collected",
+      "PCR 220",
+      "fever 39ºC",
+      "MAP 65"
+    ]
+  }'
+```
+✅ Sugerir recomendações do CCIH 
+```bash
+curl -X POST http://localhost:8000/api/agent/ccih-suggestions/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "organism": "Klebsiella pneumoniae",
+    "comorbidities": ["immunosuppression", "CKD"],
+    "previous_antibiotics": ["ceftriaxone", "amikacin"]
+  }'
+```
+
 ---
 
 ## 📁 Documentação
