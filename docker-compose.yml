@@ -74,6 +74,7 @@ services:
             python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
+      - static_volume:/app/staticfiles
     ports:
       - "8000:8000"
     depends_on:
@@ -100,14 +101,39 @@ services:
       - redis
       - qdrant
       - django
-
     environment:
       DJANGO_DB_HOST: db
       DJANGO_DB_NAME: sepsis_db
       DJANGO_DB_USER: user
       DJANGO_DB_PASSWORD: password
 
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    entrypoint: >
+      bash -c "ollama serve & sleep 5 && ollama pull llama3 && wait"
+  
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx.Dockerfile
+    container_name: nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - static_volume:/app/staticfiles
+    depends_on:
+      - django
+
+
 volumes:
   db_data:
   qdrant_data:
   minio_data:
+  ollama_data:
+  static_volume:

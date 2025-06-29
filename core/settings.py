@@ -147,3 +147,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+
+LLM = "llama"  # or "openai"
+
+DEBUG = os.getenv("DJANGO_DEBUG", "True") == "True"
+
+STATIC_URL = "/static/"
+
+if not DEBUG:
+    STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")  # collected for prod
+else:
+    STATICFILES_DIRS = [
+        os.path.join(BASE_DIR, "static")  # served directly in dev
+    ]

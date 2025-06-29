@@ -13,3 +13,5 @@ PyMuPDF==1.23.24
 
 faker
 django-cors-headers
+
+httpx
