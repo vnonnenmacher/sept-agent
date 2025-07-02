@@ -28,7 +28,7 @@ RUN chmod +x wait-for-it.sh
 # 🚨 Copy project AFTER dependency setup
 COPY . .
 
-ENV DJANGO_DEBUG=False
+ENV DJANGO_DEBUG=True
 # ✅ Now `manage.py` exists, so this will work
 RUN python manage.py collectstatic --noinput
 

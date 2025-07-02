@@ -154,9 +154,5 @@ DEBUG = os.getenv("DJANGO_DEBUG", "True") == "True"
 
 STATIC_URL = "/static/"
 
-if not DEBUG:
-    STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")  # collected for prod
-else:
-    STATICFILES_DIRS = [
-        os.path.join(BASE_DIR, "static")  # served directly in dev
-    ]
+# ✅ Always define STATIC_ROOT (Nginx + collectstatic requires this)
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")

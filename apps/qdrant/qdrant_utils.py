@@ -7,6 +7,7 @@ from qdrant_client.models import (
     VectorParams,
     Distance
 )
+from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 # Qdrant config
 COLLECTION_NAME = "clinical_knowledge"
@@ -52,3 +53,27 @@ def embed_and_store_chunks(chunks, metadata_base):
     # Upsert to Qdrant
     client.upsert(collection_name=COLLECTION_NAME, points=points)
     print(f"📤 Inserted {len(points)} vectors into '{COLLECTION_NAME}'")
+
+
+def delete_vectors_for_document(minio_path: str, collection="clinical_knowledge"):
+    """
+    Remove all vectors related to a given document path (usually the MinIO filename).
+    Assumes 'source' field in payload holds the minio_path.
+    """
+    try:
+        client.delete(
+            collection_name=collection,
+            wait=True,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(
+                        key="source",
+                        match=MatchValue(value=minio_path)
+                    )
+                ]
+            ),
+        )
+        print(f"✅ Deleted vectors for {minio_path} from Qdrant.")
+    except Exception as e:
+        print(f"❌ Failed to delete from Qdrant for {minio_path}: {e}")
+        raise
