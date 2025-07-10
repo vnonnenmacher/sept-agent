@@ -7,9 +7,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
-    default-libmysqlclient-dev \
-    default-mysql-client \
-    pkg-config \
+    libpq-dev \
     gcc \
     curl \
     && rm -rf /var/lib/apt/lists/*

@@ -1,8 +1,10 @@
 Django>=4.2
 djangorestframework
+
 celery>=5.3.0
 redis>=5.0.0
-mysqlclient
+
+psycopg2-binary>=2.9.9        # ✅ PostgreSQL driver (replaces mysqlclient)
 
 sentence-transformers
 qdrant-client
@@ -13,5 +15,4 @@ PyMuPDF==1.23.24
 
 faker
 django-cors-headers
-
 httpx

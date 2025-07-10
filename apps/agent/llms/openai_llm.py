@@ -36,3 +36,25 @@ class OpenAiLlm(BaseLlm):
         )
 
         return response.choices[0].message.content
+
+    def generate_from_prompt(self, prompt: str, text: str = None) -> str:
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "Você é um assistente clínico especializado em sepse, treinado com base no protocolo institucional."
+                    "Sempre responda em português, com base apenas nas informações fornecidas."
+                )
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ]
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages
+        )
+
+        return response.choices[0].message.content

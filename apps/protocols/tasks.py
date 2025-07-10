@@ -1,4 +1,7 @@
 from celery import shared_task
+
+from apps.agent.agents.tag_generator import TagGenerationAgent
+from apps.protocols.tag_generation import create_tags_from_document
 from .minio_utils import download_from_minio
 from .pdf_extraction import extract_text_from_pdf
 from .chunking import split_into_chunks
@@ -32,3 +35,28 @@ def process_uploaded_protocol(filename: str, version: str = "v1"):
         chunks,
         metadata_base={"source": filename, "source_version": version}
     )
+
+    create_tags_from_document_task.delay(filename=filename, version=version)
+
+
+@shared_task
+def create_tags_from_document_task(filename: str, version: str = "v1"):
+    """
+    Celery task to process a protocol document and extract clinical tags via LLM.
+    """
+    try:
+        pdf_path = download_from_minio(bucket="protocols", filename=filename)
+        full_text = extract_text_from_pdf(pdf_path)
+
+        agent = TagGenerationAgent()
+        agent.run({
+            "document_text": full_text,
+            "filename": filename,
+            "version": version,
+        })
+
+        print(f"✅ Tags created from document: {filename}")
+
+    except Exception as e:
+        print(f"❌ Failed to create tags from {filename}: {e}")
+        raise

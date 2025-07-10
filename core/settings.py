@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'apps.qdrant',
     'apps.sepsis',
     'apps.protocols',
+    'apps.agent',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -93,15 +94,14 @@ WSGI_APPLICATION = 'core.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',  # or postgres
-        'NAME': os.environ.get('DJANGO_DB_NAME'),
-        'USER': os.environ.get('DJANGO_DB_USER'),
-        'PASSWORD': os.environ.get('DJANGO_DB_PASSWORD'),
-        'HOST': os.environ.get('DJANGO_DB_HOST', 'localhost'),
-        'PORT': '3306',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('DJANGO_DB_NAME', 'sepsis_db'),
+        'USER': os.getenv('DJANGO_DB_USER', 'user'),
+        'PASSWORD': os.getenv('DJANGO_DB_PASSWORD', 'password'),
+        'HOST': os.getenv('DJANGO_DB_HOST', 'localhost'),
+        'PORT': os.getenv('DJANGO_DB_PORT', '5432'),
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
